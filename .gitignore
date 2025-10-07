@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.bak
+*.log
+
+# Environnements virtuels
+.venv/
+venv/
+ENV/
+
+# Rapports et graphs générés
+scc_reports/
+scc_graphs/
+
+# Dossiers temporaires
+scc_temp_*/
+
+# Fichiers de config sensibles
+scc_config.json
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Autres
+.DS_Store
+Thumbs.db
