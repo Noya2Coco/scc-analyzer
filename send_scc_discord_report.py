@@ -19,6 +19,10 @@ with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
 REPORT_DIR = config.get('REPORT_DIR', 'scc_reports')
 GRAPH_DIR = config.get('GRAPH_DIR', 'scc_graphs')
 WEBHOOK_URL = config.get('DISCORD_WEBHOOK_URL', '')
+# Nom et avatar du bot Discord (non modifiables par l'utilisateur)
+WEBHOOK_USERNAME = "SCC Bot"
+# Remplace cette URL par celle de ton image hébergée publiquement (ex: imgur, github raw, etc.)
+WEBHOOK_AVATAR_URL = "https://png.pngtree.com/background/20240102/original/pngtree-graph-red-flat-icon-isolated-statistics-profile-symbol-photo-picture-image_7072156.jpg"
 AUTO_GENERATE_GRAPHS = config.get('AUTO_GENERATE_GRAPHS', True)
 
 # Génération automatique des graphs si demandé
@@ -175,7 +179,6 @@ repo_link = f'\n🔗 [Voir le dépôt analysé]({repo_url})' if repo_url else ''
 summary = f"""
 {headline}{repo_link}\n\n**Période :** {week_ago.strftime('%d/%m/%Y')} → {now.strftime('%d/%m/%Y')}\n\n**Lignes de code :** {df_week['code'].iloc[-1] if len(df_week) else df['code'].iloc[-1]:,} {'🟩' if code_change > 0 else '🟥'} ({code_change:+,} {'⬆️' if code_change > 0 else '⬇️' if code_change < 0 else '➖'})\n**Fichiers Dart :** {df_week['files'].iloc[-1] if len(df_week) else df['files'].iloc[-1]:,} {'🟦' if files_change > 0 else '🟥'} ({files_change:+,} {'⬆️' if files_change > 0 else '⬇️' if files_change < 0 else '➖'})\n**Complexité :** {df_week['complexity'].iloc[-1] if len(df_week) else df['complexity'].iloc[-1]:,} {'🟪' if complexity_change > 0 else '🟧'} ({complexity_change:+,} {'⬆️' if complexity_change > 0 else '⬇️' if complexity_change < 0 else '➖'})\n**Coût estimé :** ${df_week['cost'].iloc[-1] if len(df_week) else df['cost'].iloc[-1]:,} {'💸' if cost_change > 0 else '💰'} ({cost_change:+,} {'⬆️' if cost_change > 0 else '⬇️' if cost_change < 0 else '➖'})\n\n━━━━━━━━━━━━━━━━━━━━\n\n🏆 **Records**\n• Lignes de code max : {max_code:,} ({max_code_date})\n• Complexité max : {max_complexity:,} ({max_complexity_date})\n\n━━━━━━━━━━━━━━━━━━━━\n\n📈 **Tendances**\n• Croissance hebdo : {code_change:+,} lignes\n• Fichiers créés/supprimés : {files_change:+,}\n• Complexité ajoutée/supprimée : {complexity_change:+,}\n\n━━━━━━━━━━━━━━━━━━━━\n{top_summary}\n_Envoyé automatiquement par SCC Bot_\n"""
 
-# Discord payload (embed + image)
 embed = {
     "title": "✨ Rapport Hebdomadaire SCC ✨",
     "description": summary,
@@ -183,11 +186,12 @@ embed = {
     "image": {"url": "attachment://weekly_changes.png"},
     "footer": {"text": f"Powered by SCC Bot • Généré le {now.strftime('%d/%m/%Y à %H:%M')}"}
 }
+payload = {"embeds": [embed], "username": WEBHOOK_USERNAME, "avatar_url": WEBHOOK_AVATAR_URL}
 files = {
     'file': (os.path.basename(graph_path_changes), open(graph_path_changes, 'rb'), 'image/png')
 }
 data = {
-    "payload_json": json.dumps({"embeds": [embed]})
+    "payload_json": json.dumps(payload)
 }
 
 # Envoi sur Discord
