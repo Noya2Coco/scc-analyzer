@@ -4,15 +4,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import re
+from dotenv import load_dotenv
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'scc_config.json')
-if not os.path.exists(CONFIG_PATH):
-    raise FileNotFoundError('Fichier de configuration scc_config.json manquant.')
-with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-    config = json.load(f)
+# Load environment variables from .env file
+load_dotenv()
 
-REPORT_DIR = config.get('REPORT_DIR', 'scc_reports')
-OUTPUT_GRAPH_DIR = config.get('GRAPH_DIR', 'scc_graphs')
+REPORT_DIR = os.getenv('REPORT_DIR', 'scc_reports')
+OUTPUT_GRAPH_DIR = os.getenv('GRAPH_DIR', 'scc_graphs')
 
 if not os.path.exists(OUTPUT_GRAPH_DIR):
     os.makedirs(OUTPUT_GRAPH_DIR)
@@ -104,7 +102,8 @@ df['total_cost_growth'] = (df['cost'] - df['cost'].iloc[0]) / df['cost'].iloc[0]
 
 def make_plot(y, title, ylabel, filename, color='blue'):
     plt.figure(figsize=(10,5))
-    plt.plot(df['date'], df[y], marker='o', color=color)
+    # Tracer uniquement la courbe (sans points)
+    plt.plot(df['date'], df[y], color=color)
     plt.xticks(rotation=45, ha='right')
     plt.title(title)
     plt.xlabel('Date')
@@ -141,12 +140,13 @@ def make_bar_plot(y, title, ylabel, filename, color='blue'):
 def make_correlation_plot(x, y, title, xlabel, ylabel, filename):
     """Graphique de corrélation entre deux variables"""
     plt.figure(figsize=(8,6))
-    plt.scatter(df[x], df[y], alpha=0.6, c=range(len(df)), cmap='viridis')
-    plt.colorbar(label='Ordre chronologique')
+    # Remplacer le nuage de points par un hexbin (pas de points individuels)
+    hb = plt.hexbin(df[x], df[y], gridsize=30, cmap='viridis')
+    plt.colorbar(hb, label='Densité')
     
     # Ligne de tendance
     if len(df) > 1:
-        z = np.polyfit(df[x], df[y], 1)
+        z = np.polyfit(df[x].astype(float), df[y].astype(float), 1)
         p = np.poly1d(z)
         plt.plot(df[x], p(df[x]), "r--", alpha=0.8)
     
@@ -193,8 +193,8 @@ make_correlation_plot('code', 'cost', 'Corrélation Code vs Coût', 'Lignes de c
 # Évolution des changements cumulés
 plt.figure(figsize=(12,8))
 plt.subplot(2, 2, 1)
-plt.plot(df['date'], df['code_change'].cumsum(), marker='o', color='blue', label='Code')
-plt.plot(df['date'], df['files_change'].cumsum(), marker='s', color='purple', label='Fichiers')
+plt.plot(df['date'], df['code_change'].cumsum(), color='blue', label='Code')
+plt.plot(df['date'], df['files_change'].cumsum(), color='purple', label='Fichiers')
 plt.xticks(rotation=45, ha='right')
 plt.title('Changements cumulés')
 plt.xlabel('Date')
@@ -213,7 +213,7 @@ plt.grid(True, alpha=0.3)
 # Évolution de l'efficacité (complexité/coût)
 plt.subplot(2, 2, 3)
 efficiency = df['complexity'] / df['cost'].replace(0, 1)
-plt.plot(df['date'], efficiency, marker='o', color='red')
+plt.plot(df['date'], efficiency, color='red')
 plt.xticks(rotation=45, ha='right')
 plt.title('Efficacité (Complexité/Coût)')
 plt.xlabel('Date')
@@ -223,7 +223,7 @@ plt.grid(True, alpha=0.3)
 # Tendance de croissance
 plt.subplot(2, 2, 4)
 growth_rate = df['code'].pct_change() * 100
-plt.plot(df['date'], growth_rate, marker='o', color='green')
+plt.plot(df['date'], growth_rate, color='green')
 plt.axhline(y=0, color='black', linestyle='--', alpha=0.5)
 plt.xticks(rotation=45, ha='right')
 plt.title('Taux de croissance du code (%)')
@@ -256,8 +256,8 @@ plt.grid(True, alpha=0.3)
 plt.subplot(1, 2, 2)
 if len(df) >= 30:
     recent_df = df.tail(30)
-    plt.plot(recent_df['date'], recent_df['code'], marker='o', color='blue', label='Code')
-    plt.plot(recent_df['date'], recent_df['complexity'], marker='s', color='red', label='Complexité')
+    plt.plot(recent_df['date'], recent_df['code'], color='blue', label='Code')
+    plt.plot(recent_df['date'], recent_df['complexity'], color='red', label='Complexité')
     plt.xticks(rotation=45, ha='right')
     plt.title('Tendance des 30 derniers commits')
     plt.xlabel('Date')
@@ -315,7 +315,8 @@ for col, color in [
 ]:
     if df[col].max() > df[col].min():
         norm = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
-        plt.plot(df['date'], norm, marker='o', label=col.capitalize(), color=color)
+        # Tracer uniquement la courbe normalisée (sans points)
+        plt.plot(df['date'], norm, label=col.capitalize(), color=color)
 
 plt.xticks(rotation=45, ha='right')
 plt.title('Évolution normalisée des indicateurs')
@@ -325,6 +326,39 @@ plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'combined_normalized.png'))
+plt.close()
+
+# 9. Courbes de ratios normalisées (min-max par série)
+# Ces courbes comparent des rapports utiles tout en replaçant
+# chaque série à l'échelle 0-1 pour éviter qu'une série domine l'axe.
+ratios = {
+    'Lignes / Fichier': df['code'] / df['files'].replace(0, pd.NA),
+    # inverser Lignes/Complexité → Complexité/Lignes selon demande
+    'Complexité / Lignes': df['complexity'] / df['code'].replace(0, pd.NA),
+    'Complexité / Fichier': df['complexity'] / df['files'].replace(0, pd.NA),
+    'Octets / Fichier': df['bytes'] / df['files'].replace(0, pd.NA)
+}
+
+ratio_df = pd.DataFrame({k: v.replace([np.inf, -np.inf], pd.NA).fillna(0) for k, v in ratios.items()})
+
+# Min-max normalization per-series (avoid division by zero)
+norm_den = (ratio_df.max() - ratio_df.min()).replace(0, 1)
+ratio_norm = (ratio_df - ratio_df.min()) / norm_den
+
+plt.figure(figsize=(12, 6))
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+for i, col in enumerate(ratio_norm.columns):
+    # Tracer uniquement des courbes (sans points) pour une lecture plus propre
+    plt.plot(df['date'], ratio_norm[col], label=col, color=colors[i % len(colors)])
+
+plt.xticks(rotation=45, ha='right')
+plt.title('Courbes comparatives des ratios (normalisées par série 0-1)')
+plt.xlabel('Date')
+plt.ylabel('Valeur normalisée (0-1)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'ratio_curves.png'), dpi=300)
 plt.close()
 
 print(f"\n✅ Graphiques générés dans {OUTPUT_GRAPH_DIR}")

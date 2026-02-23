@@ -5,46 +5,94 @@ import shutil
 import subprocess
 import tempfile
 import json
+import re
+import argparse
+import sys
+from dotenv import load_dotenv
 
-def ask_param(prompt, default=None):
-    val = input(f"{prompt} [{default if default is not None else ''}]: ").strip()
-    return val if val else default
+# Load environment variables from .env file
+load_dotenv()
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'scc_config.json')
 def load_config():
-    # Valeurs attendues et prompts
-    required = [
-        ("REPO_URL", "Entrez l'URL du dépôt Git à analyser"),
-        ("BRANCH", "Entrez le nom de la branche à analyser"),
-        ("REPORT_DIR", "Répertoire de sortie des rapports"),
-        ("GRAPH_DIR", "Répertoire de sortie des graphs"),
-        ("DISCORD_WEBHOOK_URL", "URL du webhook Discord (laisser vide si non utilisé)"),
-        ("AUTO_GENERATE_GRAPHS", "Générer automatiquement les graphs ? (true/false)")
-    ]
-    config = {}
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-    changed = False
-    for key, prompt in required:
-        if key not in config or config[key] in (None, ""):
-            default = "true" if key == "AUTO_GENERATE_GRAPHS" else ""
-            val = ask_param(prompt, default)
-            if key == "AUTO_GENERATE_GRAPHS":
-                val = val.lower() in ("true", "1", "yes", "oui", "y")
-            config[key] = val
-            changed = True
-    if changed:
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2)
+    """Load configuration from environment variables."""
+    config = {
+        'REPO_URL': os.getenv('REPO_URL'),
+        'BRANCH': os.getenv('BRANCH', 'main'),
+        'REPORT_DIR': os.getenv('REPORT_DIR', 'scc_reports'),
+        'GRAPH_DIR': os.getenv('GRAPH_DIR', 'scc_graphs'),
+        'DISCORD_WEBHOOK_URL': os.getenv('DISCORD_WEBHOOK_URL', ''),
+        'AUTO_GENERATE_GRAPHS': os.getenv('AUTO_GENERATE_GRAPHS', 'true').lower() in ('true', '1', 'yes')
+    }
+    
+    if not config['REPO_URL']:
+        raise ValueError('REPO_URL must be set in .env file')
+    
     return config
-def save_config(repo_url, branch, output_dir):
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump({'REPO_URL': repo_url, 'BRANCH': branch, 'REPORT_DIR': output_dir}, f, indent=2)
 
 config = load_config()
 REPO_URL = config['REPO_URL']
-BRANCH = config['BRANCH']
+
+def select_latest_version_branch(repo_url):
+    """Return the branch name with the highest version like v1.2.3 from remote heads.
+    Falls back to 'main' or 'master' if none found. Returns None on error."""
+    try:
+        res = subprocess.run(['git', 'ls-remote', '--heads', repo_url], capture_output=True, text=True, check=True)
+        lines = [l.strip() for l in res.stdout.splitlines() if l.strip()]
+        version_branches = []
+        for line in lines:
+            # line format: <sha>\trefs/heads/<branch>
+            parts = line.split('\t')
+            if len(parts) != 2:
+                continue
+            ref = parts[1]
+            if ref.startswith('refs/heads/'):
+                branch = ref[len('refs/heads/'):]
+                m = re.match(r'^v(\d+(?:\.\d+)*)$', branch)
+                if m:
+                    ver_str = m.group(1)
+                    ver_tuple = tuple(int(x) for x in ver_str.split('.'))
+                    version_branches.append((ver_tuple, branch))
+        if version_branches:
+            # pick branch with max version tuple (lexicographic on ints)
+            version_branches.sort(key=lambda x: x[0], reverse=True)
+            return version_branches[0][1]
+        # fallback: try detect 'main' or 'master' among remote heads
+        for line in lines:
+            parts = line.split('\t')
+            if len(parts) != 2:
+                continue
+            ref = parts[1]
+            if ref.endswith('/main'):
+                return 'main'
+            if ref.endswith('/master'):
+                return 'master'
+        return None
+    except Exception:
+        return None
+
+parser = argparse.ArgumentParser(description='Extract SCC history from a repo (with branch auto-detect).')
+parser.add_argument('--branch', '-b', help='Branch to analyze (overrides auto-detection)')
+args = parser.parse_args()
+
+# Determine branch: CLI override > auto-detected highest v* branch > config BRANCH > 'main'
+if args.branch:
+    BRANCH = args.branch
+else:
+    detected = select_latest_version_branch(config.get('REPO_URL'))
+    if detected:
+        BRANCH = detected
+    else:
+        BRANCH = config.get('BRANCH') if config.get('BRANCH') else 'main'
+
+# Persist chosen branch back to config for transparency
+if config.get('BRANCH') != BRANCH:
+    config['BRANCH'] = BRANCH
+    try:
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2)
+    except Exception:
+        pass
+
 OUTPUT_DIR = os.path.abspath(config.get('REPORT_DIR', 'scc_reports'))
 
 if not os.path.exists(OUTPUT_DIR):

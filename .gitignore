@@ -22,6 +22,7 @@ scc_temp_*/
 
 # Fichiers de config sensibles
 scc_config.json
+.env
 
 # Jupyter
 .ipynb_checkpoints/
