@@ -1,65 +1,76 @@
 # SCC History & Discord Reporter
 
-Ce projet automatise l'extraction de l'historique d'un dépôt Git, l'analyse de code avec [scc](https://github.com/boyter/scc), la génération de graphiques d'évolution, et l'envoi de rapports hebdomadaires sur Discord.
+This project automates the extraction of Git repository history, code analysis with [scc](https://github.com/boyter/scc), generation of evolution graphs, and sending weekly reports to Discord.
 
-## Fonctionnalités
-- Extraction de l'historique de code (lignes, complexité, coût, etc.) commit par commit
-- Génération de rapports SCC (JSON + TXT)
-- Génération de graphiques d'évolution et de qualité
-- Envoi automatique d'un rapport synthétique sur Discord avec graphique
-- Configuration centralisée (scc_config.json)
+## Features
+- Extract code history (lines, complexity, cost, etc.) commit by commit
+- Generate SCC reports (JSON + TXT)
+- Generate evolution and quality graphs
+- Automatically send synthetic reports to Discord with graphs
+- Centralized configuration via .env file
 
-## Prérequis
+## Prerequisites
 - Python 3.8+
-- [scc](https://github.com/boyter/scc) (installé et accessible dans le PATH)
-- Git (installé)
-- [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/), [numpy](https://numpy.org/), [requests](https://requests.readthedocs.io/)
+- [scc](https://github.com/boyter/scc) (installed and accessible in PATH)
+- Git (installed)
+- [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/), [numpy](https://numpy.org/), [requests](https://requests.readthedocs.io/), [python-dotenv](https://pypi.org/project/python-dotenv/)
 
 ## Installation
-1. Clonez ce dépôt
-2. Installez les dépendances Python :
+1. Clone this repository
+2. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. Installez scc (voir https://github.com/boyter/scc)
+3. Install scc (see https://github.com/boyter/scc)
+4. Copy `.env.example` to `.env` and configure your settings:
+   ```bash
+   cp .env.example .env
+   ```
+5. Edit `.env` with your repository URL, Discord webhook, etc.
 
 ## Configuration
-- Lancez un des scripts, il vous demandera les paramètres manquants et créera `scc_config.json`.
-- Modifiez ce fichier pour adapter les chemins, le webhook Discord, etc.
+All configuration is done via the `.env` file:
+- `REPO_URL`: Git repository URL to analyze
+- `BRANCH`: Branch to analyze (default: main)
+- `DISCORD_WEBHOOK_URL`: Discord webhook URL for reports
+- `WEBHOOK_AVATAR_URL`: Avatar URL for Discord bot
+- `REPORT_DIR`: Directory for SCC reports (default: scc_reports)
+- `GRAPH_DIR`: Directory for generated graphs (default: scc_graphs)
+- `AUTO_GENERATE_GRAPHS`: Auto-generate graphs (true/false)
 
-## Utilisation
-- **Extraction de l'historique** :
+## Usage
+- **Extract history**:
   ```bash
   python extract_scc_history.py
   ```
-- **Génération des graphiques** :
+- **Generate graphs**:
   ```bash
   python plot_scc_history.py
   ```
-- **Envoi du rapport Discord** :
+- **Send Discord report**:
   ```bash
   python send_scc_discord_report.py
   ```
-- **Automatisation (cron Windows)** :
+- **Automation (Windows cron)**:
   ```bash
   python scc_cron_job.py
   ```
 
-## Structure des dossiers
-- `scc_reports/` : rapports SCC générés (JSON, TXT)
-- `scc_graphs/` : graphiques générés (PNG)
+## Directory Structure
+- `scc_reports/` : Generated SCC reports (JSON, TXT)
+- `scc_graphs/` : Generated graphs (PNG)
 
-## Personnalisation
-- Modifiez les scripts pour changer la branche, le dépôt, le format des graphs, etc.
-- Le message Discord et le graphique sont personnalisables dans `send_scc_discord_report.py`.
+## Customization
+- Modify scripts to change branch, repository, graph format, etc.
+- Discord message and graphs are customizable in `send_scc_discord_report.py`.
 
-## Exemples de rendu
-- Voir le dossier `scc_graphs/` pour les graphiques générés
-- Exemple de rapport Discord dans la documentation ou le README
+## Examples
+- See `scc_graphs/` folder for generated graphs
+- Discord report example in documentation or README
 
-## Licence
+## License
 MIT
 
 ---
 
-*Projet automatisé pour le suivi d'évolution de code et la communication d'équipe !*
+*Automated project for code evolution tracking and team communication!*

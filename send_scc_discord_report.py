@@ -1,5 +1,5 @@
 # send_scc_discord_report.py
-# Envoie un rapport SCC hebdomadaire "sublime" sur Discord
+# Sends a weekly SCC report to Discord
 import os
 import json
 import pandas as pd
@@ -16,21 +16,21 @@ load_dotenv()
 REPORT_DIR = os.getenv('REPORT_DIR', 'scc_reports')
 GRAPH_DIR = os.getenv('GRAPH_DIR', 'scc_graphs')
 WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL', '')
-# Nom et avatar du bot Discord (non modifiables par l'utilisateur)
+# Discord bot name and avatar (not user-configurable)
 WEBHOOK_USERNAME = "SCC Bot"
 WEBHOOK_AVATAR_URL = os.getenv('WEBHOOK_AVATAR_URL', 'https://icons-for-free.com/iff/png/512/graph+graphic+graphics+icon-1320168051322057462.png')
 AUTO_GENERATE_GRAPHS = os.getenv('AUTO_GENERATE_GRAPHS', 'true').lower() in ('true', '1', 'yes')
 
-# Génération automatique des graphs si demandé
+# Auto-generate graphs if requested
 if AUTO_GENERATE_GRAPHS:
     import plot_scc_history
 
-# Charger les données SCC
+# Load SCC data
 json_files = [f for f in os.listdir(REPORT_DIR) if f.endswith('.json')]
 data = []
 for file in sorted(json_files):
     commit_date_str = file.replace('scc_', '').replace('.json', '')
-    # Correction : retirer le suffixe fuseau horaire (_+xxxx ou _-xxxx)
+    # Fix: remove timezone suffix (_+xxxx or _-xxxx)
     if '_+' in commit_date_str:
         commit_date_str = commit_date_str.split('_+')[0]
     if '_-' in commit_date_str:
@@ -77,16 +77,16 @@ for file in sorted(json_files):
     except Exception as e:
         continue
 if not data:
-    print('Aucune donnée exploitable.')
+    print('No usable data.')
     exit(1)
 df = pd.DataFrame(data).sort_values(by='date')
 
-# Filtrer la dernière semaine
+# Filter last week
 now = datetime.now()
 week_ago = now - timedelta(days=7)
 df_week = df[df['date'] >= week_ago]
 
-# Statistiques clés
+# Key statistics
 code_change = int(df_week['code'].iloc[-1] - df_week['code'].iloc[0]) if len(df_week) > 1 else 0
 files_change = int(df_week['files'].iloc[-1] - df_week['files'].iloc[0]) if len(df_week) > 1 else 0
 complexity_change = int(df_week['complexity'].iloc[-1] - df_week['complexity'].iloc[0]) if len(df_week) > 1 else 0
@@ -97,13 +97,13 @@ max_code_date = df.loc[df['code'].idxmax(), 'date'].strftime('%d/%m/%Y')
 max_complexity = df['complexity'].max()
 max_complexity_date = df.loc[df['complexity'].idxmax(), 'date'].strftime('%d/%m/%Y')
 
-# Calculer les changements
+# Calculate changes
 if 'code_change' not in df.columns:
     df['code_change'] = df['code'].diff().fillna(0).astype(int)
 if 'complexity_change' not in df.columns:
     df['complexity_change'] = df['complexity'].diff().fillna(0).astype(int)
 
-# Calcul des tendances sur 3 mois (moyenne hebdomadaire sur 90 jours)
+# Calculate 3-month trends (weekly average over 90 days)
 three_months_ago = now - timedelta(days=90)
 df_3m = df[df['date'] >= three_months_ago]
 if len(df_3m) >= 2:
@@ -116,14 +116,14 @@ if len(df_3m) >= 2:
 else:
     avg_weekly_code = avg_weekly_files = avg_weekly_complexity = avg_weekly_cost = 0
 
-# Générer un graphique principal (évolution code/complexité)
+# Generate main graph (code/complexity evolution)
 plt.figure(figsize=(10,5))
-# Tracer uniquement des courbes (sans points)
-plt.plot(df['date'], df['code'], label='Lignes de code', color='#3498db')
-plt.plot(df['date'], df['complexity'], label='Complexité', color='#e74c3c')
-plt.title('Évolution du code et de la complexité')
+# Plot curves only (no points)
+plt.plot(df['date'], df['code'], label='Lines of Code', color='#3498db')
+plt.plot(df['date'], df['complexity'], label='Complexity', color='#e74c3c')
+plt.title('Code and Complexity Evolution')
 plt.xlabel('Date')
-plt.ylabel('Valeur')
+plt.ylabel('Value')
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
@@ -131,29 +131,29 @@ graph_path = os.path.join(GRAPH_DIR, 'weekly_main.png')
 plt.savefig(graph_path)
 plt.close()
 
-# Générer un graphique des variations par commit (code_change et complexity_change)
+# Generate variations per commit graph (code_change and complexity_change)
 plt.figure(figsize=(12,6))
 bar_width = 0.4
 x = np.arange(len(df))
-# Couleurs dynamiques selon le signe
+# Dynamic colors based on sign
 code_colors = ['#2ecc40' if v > 0 else '#3498db' for v in df['code_change']]
 cplx_colors = ['#e74c3c' if v > 0 else '#f1c40f' for v in df['complexity_change']]
-# Barres côte à côte
-bars_code = plt.bar(x - bar_width/2, df['code_change'], width=bar_width, color=code_colors, alpha=0.8, label='Δ Lignes de code (⬆️ vert, ⬇️ bleu)')
-bars_cplx = plt.bar(x + bar_width/2, df['complexity_change'], width=bar_width, color=cplx_colors, alpha=0.8, label='Δ Complexité (⬆️ rouge, ⬇️ orange)')
-# Dates espacées (1 sur 7)
+# Side-by-side bars
+bars_code = plt.bar(x - bar_width/2, df['code_change'], width=bar_width, color=code_colors, alpha=0.8, label='Δ Lines of Code (⬆️ green, ⬇️ blue)')
+bars_cplx = plt.bar(x + bar_width/2, df['complexity_change'], width=bar_width, color=cplx_colors, alpha=0.8, label='Δ Complexity (⬆️ red, ⬇️ orange)')
+# Spaced dates (1 in 7)
 step = max(1, len(df)//14)
 plt.xticks(x[::step], [d.strftime('%m-%d') for d in df['date']][::step], rotation=45, ha='right', fontsize=9)
-plt.title('Changements par commit (lignes de code & complexité)')
+plt.title('Changes per Commit (lines of code & complexity)')
 plt.xlabel('Date')
 plt.ylabel('Variation')
-# Légende explicite
+# Explicit legend
 from matplotlib.patches import Patch
 legend_elements = [
-    Patch(facecolor='#2ecc40', label='Lignes de code ↑ (vert)'),
-    Patch(facecolor='#3498db', label='Lignes de code ↓ (bleu)'),
-    Patch(facecolor='#e74c3c', label='Complexité ↑ (rouge)'),
-    Patch(facecolor='#f1c40f', label='Complexité ↓ (orange)')
+    Patch(facecolor='#2ecc40', label='Lines of Code ↑ (green)'),
+    Patch(facecolor='#3498db', label='Lines of Code ↓ (blue)'),
+    Patch(facecolor='#e74c3c', label='Complexity ↑ (red)'),
+    Patch(facecolor='#f1c40f', label='Complexity ↓ (orange)')
 ]
 plt.legend(handles=legend_elements)
 plt.grid(True, alpha=0.3)
@@ -162,61 +162,61 @@ graph_path_changes = os.path.join(GRAPH_DIR, 'weekly_changes.png')
 plt.savefig(graph_path_changes)
 plt.close()
 
-# Top 3 commits (ajout, suppression, pic complexité)
+# Top 3 commits (addition, deletion, complexity peak)
 top_add = df['code_change'].idxmax()
 top_del = df['code_change'].idxmin()
 top_cplx = df['complexity_change'].idxmax()
 top_summary = f"""
-**Top commits :**
-• ➕ {df['code_change'].max():,} lignes le {df.loc[top_add, 'date'].strftime('%d/%m/%Y')}
-• ➖ {df['code_change'].min():,} lignes le {df.loc[top_del, 'date'].strftime('%d/%m/%Y')}
-• 🟥 +{df['complexity_change'].max():,} complexité le {df.loc[top_cplx, 'date'].strftime('%d/%m/%Y')}
+**Top commits:**
+• ➕ {df['code_change'].max():,} lines on {df.loc[top_add, 'date'].strftime('%d/%m/%Y')}
+• ➖ {df['code_change'].min():,} lines on {df.loc[top_del, 'date'].strftime('%d/%m/%Y')}
+• 🟥 +{df['complexity_change'].max():,} complexity on {df.loc[top_cplx, 'date'].strftime('%d/%m/%Y')}
 """
 
-# Résumé visuel rapide
+# Quick visual summary
 if code_change > 100:
-    headline = '🔥 **Semaine record de développement !**'
+    headline = '🔥 **Record development week!**'
 elif code_change < 0:
-    headline = '📉 **Semaine de refactoring ou nettoyage !**'
+    headline = '📉 **Refactoring or cleanup week!**'
 else:
-    headline = '📊 **Semaine stable**'
+    headline = '📊 **Stable week**'
 
-# Lien vers le repo
+# Link to repo
 repo_url = os.getenv('REPO_URL', '')
-repo_link = f'\n🔗 [Voir le dépôt analysé]({repo_url})' if repo_url else ''
+repo_link = f'\n🔗 [View analyzed repository]({repo_url})' if repo_url else ''
 
-# Message Discord formaté — description (embed title set separately)
+# Discord formatted message — description (embed title set separately)
 summary = f"""
 {headline}{repo_link}
 
-**Période :** {week_ago.strftime('%d/%m/%Y')} → {now.strftime('%d/%m/%Y')}
+**Period:** {week_ago.strftime('%d/%m/%Y')} → {now.strftime('%d/%m/%Y')}
 
-**Lignes de code :** {df_week['code'].iloc[-1] if len(df_week) else df['code'].iloc[-1]:,} {'🟩' if code_change > 0 else '🟥'} ({code_change:+,} {'⬆️' if code_change > 0 else '⬇️' if code_change < 0 else '➖'})
-**Fichiers Dart :** {df_week['files'].iloc[-1] if len(df_week) else df['files'].iloc[-1]:,} {'🟦' if files_change > 0 else '🟥'} ({files_change:+,} {'⬆️' if files_change > 0 else '⬇️' if files_change < 0 else '➖'})
-**Complexité :** {df_week['complexity'].iloc[-1] if len(df_week) else df['complexity'].iloc[-1]:,} {'🟥' if complexity_change > 0 else '🟧'} ({complexity_change:+,} {'⬆️' if complexity_change > 0 else '⬇️' if complexity_change < 0 else '➖'})
-**Coût estimé :** ${df_week['cost'].iloc[-1] if len(df_week) else df['cost'].iloc[-1]:,} {'💸' if cost_change > 0 else '💰'} ({cost_change:+,} {'⬆️' if cost_change > 0 else '⬇️' if cost_change < 0 else '➖'})
+**Lines of Code:** {df_week['code'].iloc[-1] if len(df_week) else df['code'].iloc[-1]:,} {'🟩' if code_change > 0 else '🟥'} ({code_change:+,} {'⬆️' if code_change > 0 else '⬇️' if code_change < 0 else '➖'})
+**Dart Files:** {df_week['files'].iloc[-1] if len(df_week) else df['files'].iloc[-1]:,} {'🟦' if files_change > 0 else '🟥'} ({files_change:+,} {'⬆️' if files_change > 0 else '⬇️' if files_change < 0 else '➖'})
+**Complexity:** {df_week['complexity'].iloc[-1] if len(df_week) else df['complexity'].iloc[-1]:,} {'🟥' if complexity_change > 0 else '🟧'} ({complexity_change:+,} {'⬆️' if complexity_change > 0 else '⬇️' if complexity_change < 0 else '➖'})
+**Estimated Cost:** ${df_week['cost'].iloc[-1] if len(df_week) else df['cost'].iloc[-1]:,} {'💸' if cost_change > 0 else '💰'} ({cost_change:+,} {'⬆️' if cost_change > 0 else '⬇️' if cost_change < 0 else '➖'})
 
 ━━━━━━━━━━━━━━━━━━━━
 
 🏆 **Records**
-• Lignes de code max : {max_code:,} ({max_code_date})
-• Complexité max : {max_complexity:,} ({max_complexity_date})
+• Max lines of code: {max_code:,} ({max_code_date})
+• Max complexity: {max_complexity:,} ({max_complexity_date})
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📈 **Tendances (moyenne hebdo sur 3 mois)**
-• Croissance hebdo : {avg_weekly_code:+,} lignes
-• Fichiers : {avg_weekly_files:+,}
-• Complexité : {avg_weekly_complexity:+,}
+📈 **Trends (weekly average over 3 months)**
+• Weekly growth: {avg_weekly_code:+,} lines
+• Files: {avg_weekly_files:+,}
+• Complexity: {avg_weekly_complexity:+,}
 
 ━━━━━━━━━━━━━━━━━━━━
 {top_summary}
-_Envoyé automatiquement par SCC Bot_
+_Sent automatically by SCC Bot_
 """
 
 ratio_path = os.path.join(GRAPH_DIR, 'ratio_curves.png')
 
-# Calculer le top-N des fichiers par LOC dans le projet Flutter (si présent)
+# Calculate top-N files by LOC in Flutter project (if present)
 def compute_top_loc(top=10):
     """Compute top-N files by code lines.
     Restrict scan to the `lib/` directory when present and only count `.dart` files.
@@ -265,36 +265,36 @@ def compute_top_loc(top=10):
 
 top_list, project_root = compute_top_loc(top=10)
 if top_list:
-    lines = ['**Top 10 fichiers (par Lignes de code) :**']
+    lines = ['**Top 10 files (by Lines of Code):**']
     for i, (p, total, code, comment, blank) in enumerate(top_list, start=1):
         try:
             rel = os.path.relpath(p, start=project_root)
         except Exception:
             rel = p
-        lines.append(f"{i}. `{rel}` — {code:,} lignes (total {total:,}, comm {comment:,}, vides {blank:,})")
+        lines.append(f"{i}. `{rel}` — {code:,} lines (total {total:,}, comments {comment:,}, blank {blank:,})")
     top_block = "\n".join(lines)
-    # stocker le bloc pour l'ajouter plus tard (embed_ratio n'est pas encore défini)
-    # limiter la taille pour rester sous la limite d'embed Discord (~4096 chars)
+    # store the block to add later (embed_ratio not yet defined)
+    # limit size to stay under Discord embed limit (~4096 chars)
     if len(top_block) > 3700:
         top_block = top_block[:3690] + '\n...'
 
-# Préparer deux embeds : 1) résumé + weekly_changes.png  2) courbes normalisées (ratio_curves.png)
+# Prepare two embeds: 1) summary + weekly_changes.png  2) normalized curves (ratio_curves.png)
 embed_main = {
-    "title": "✨ Rapport Hebdomadaire SCC ✨",
+    "title": "✨ Weekly SCC Report ✨",
     "description": summary,
     "color": 0x3498db,
     "author": {"name": WEBHOOK_USERNAME, "icon_url": WEBHOOK_AVATAR_URL},
     "image": {"url": "attachment://weekly_changes.png"},
-    "footer": {"text": f"Powered by SCC Bot • Généré le {now.strftime('%d/%m/%Y à %H:%M') }"}
+    "footer": {"text": f"Powered by SCC Bot • Generated on {now.strftime('%d/%m/%Y at %H:%M') }"}
 }
 embed_ratio = {
-    "title": "📊 Courbes de ratios (normalisées)",
-    "description": "Comparaison normalisée des ratios utiles (lignes/fichier, lignes/complexité, ...)",
+    "title": "📊 Ratio Curves (normalized)",
+    "description": "Normalized comparison of useful ratios (lines/file, lines/complexity, ...)",
     "color": 0x2ecc71,
     "image": {"url": "attachment://ratio_curves.png"}
 }
 
-# Si on a calculé un top_block plus haut, l'ajouter maintenant à la description
+# If we calculated a top_block above, add it now to the description
 try:
     if top_list:
         desc = embed_ratio.get('description', '') + '\n\n' + top_block
@@ -302,54 +302,54 @@ try:
             desc = desc[:3790] + '\n...'
         embed_ratio['description'] = desc
 except NameError:
-    # top_list/top_block non définis : rien à faire
+    # top_list/top_block not defined: nothing to do
     pass
 
 payload = {"embeds": [embed_main, embed_ratio], "username": WEBHOOK_USERNAME, "avatar_url": WEBHOOK_AVATAR_URL}
 
-# Construire la liste de fichiers à envoyer. Discord accepte plusieurs fichiers sous la même clé 'file'.
+# Build list of files to send. Discord accepts multiple files under the same 'file' key.
 files_to_send = []
 if os.path.exists(graph_path_changes):
     files_to_send.append((os.path.basename(graph_path_changes), graph_path_changes))
 else:
-    print(f'⚠️ Graphique manquant: {graph_path_changes}')
+    print(f'⚠️ Missing graph: {graph_path_changes}')
 if os.path.exists(ratio_path):
     files_to_send.append((os.path.basename(ratio_path), ratio_path))
 else:
-    print(f'⚠️ Graphique manquant: {ratio_path}')
+    print(f'⚠️ Missing graph: {ratio_path}')
 
 data = {
     "payload_json": json.dumps(payload)
 }
 
-# Ouvrir les fichiers dans un context manager pour s'assurer de leur fermeture
+# Open files in a context manager to ensure closure
 opened = []
 try:
     for fname, fpath in files_to_send:
         f = open(fpath, 'rb')
         opened.append(f)
-    # Construire un mapping explicite file0/file1/... pour éviter que
-    # certains endpoints n'acceptent qu'une seule clé 'file'.
+    # Build explicit file0/file1/... mapping to avoid
+    # some endpoints only accepting a single 'file' key.
     files = []
     for i, (fname, _) in enumerate(files_to_send):
         field_name = f'file{i}'
-        # trouver le fileobj correspondant (opened list matches files_to_send order)
+        # find corresponding fileobj (opened list matches files_to_send order)
         fileobj = opened[i]
-        # essayer de deviner le mime type, tomber sur image/png par défaut
+        # try to guess mime type, default to image/png
         mime = 'image/png'
         files.append((field_name, (fname, fileobj, mime)))
 
-    # Debug: lister les fichiers attachés et les champs multipart
-    print('📎 Fichiers attachés :', [fname for fname, _ in files_to_send])
-    print('📎 Champs multipart envoyés :', [f[0] for f in files])
+    # Debug: list attached files and multipart fields
+    print('📎 Attached files:', [fname for fname, _ in files_to_send])
+    print('📎 Multipart fields sent:', [f[0] for f in files])
 
-    # Envoi sur Discord — payload_json + fichiers nommés file0,file1,...
+    # Send to Discord — payload_json + files named file0,file1,...
     resp = requests.post(WEBHOOK_URL, data=data, files=files)
     print('Discord response:', resp.status_code, resp.text)
     if resp.status_code in (200, 204):
-        print('✅ Rapport envoyé sur Discord ! (avec pièces jointes si présentes)')
+        print('✅ Report sent to Discord! (with attachments if present)')
     else:
-        print(f'Erreur Discord: {resp.status_code} {resp.text}')
+        print(f'Discord error: {resp.status_code} {resp.text}')
 finally:
     for f in opened:
         try:

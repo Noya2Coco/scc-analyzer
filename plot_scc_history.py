@@ -74,35 +74,35 @@ for file in sorted(json_files):
         print(f"{commit_date} | Code: {code}, Compl: {complexity}, $: {cost}, Effort: {effort}, People: {people}")
 
     except Exception as e:
-        print(f"Erreur sur {file} : {e}")
+        print(f"Error on {file}: {e}")
 
 if not data:
-    print("⚠ Aucun fichier exploitable.")
+    print("⚠ No usable files.")
     exit(1)
 
 df = pd.DataFrame(data).sort_values(by='date')
 
-# Calcul des différences (changements par commit)
+# Calculate differences (changes per commit)
 df['code_change'] = df['code'].diff()
 df['files_change'] = df['files'].diff()
 df['complexity_change'] = df['complexity'].diff()
 df['bytes_change'] = df['bytes'].diff()
 
-# Calcul des ratios et métriques de qualité
-df['complexity_per_line'] = df['complexity'] / df['code'].replace(0, 1)  # Éviter division par zéro
+# Calculate ratios and quality metrics
+df['complexity_per_line'] = df['complexity'] / df['code'].replace(0, 1)  # Avoid division by zero
 df['bytes_per_file'] = df['bytes'] / df['files'].replace(0, 1)
 df['lines_per_file'] = df['code'] / df['files'].replace(0, 1)
 
-# Calcul de la vélocité (changements par unité de temps)
+# Calculate velocity (changes per time unit)
 df['days_since_start'] = (df['date'] - df['date'].min()).dt.days
-df['velocity'] = df['code'] / (df['days_since_start'] + 1)  # +1 pour éviter division par zéro
+df['velocity'] = df['code'] / (df['days_since_start'] + 1)  # +1 to avoid division by zero
 
-# Métriques cumulatives
+# Cumulative metrics
 df['total_cost_growth'] = (df['cost'] - df['cost'].iloc[0]) / df['cost'].iloc[0] * 100 if df['cost'].iloc[0] > 0 else 0
 
 def make_plot(y, title, ylabel, filename, color='blue'):
     plt.figure(figsize=(10,5))
-    # Tracer uniquement la courbe (sans points)
+    # Plot curve only (no points)
     plt.plot(df['date'], df[y], color=color)
     plt.xticks(rotation=45, ha='right')
     plt.title(title)
@@ -114,11 +114,11 @@ def make_plot(y, title, ylabel, filename, color='blue'):
     plt.close()
 
 def make_bar_plot(y, title, ylabel, filename, color='blue'):
-    """Graphique en barres pour les changements"""
+    """Bar chart for changes"""
     plt.figure(figsize=(12,6))
     bars = plt.bar(range(len(df)), df[y], color=color, alpha=0.7)
     
-    # Colorier les barres négatives différemment
+    # Color negative bars differently
     for i, bar in enumerate(bars):
         if df[y].iloc[i] < 0:
             bar.set_color('red')
@@ -138,13 +138,13 @@ def make_bar_plot(y, title, ylabel, filename, color='blue'):
     plt.close()
 
 def make_correlation_plot(x, y, title, xlabel, ylabel, filename):
-    """Graphique de corrélation entre deux variables"""
+    """Correlation plot between two variables"""
     plt.figure(figsize=(8,6))
-    # Remplacer le nuage de points par un hexbin (pas de points individuels)
+    # Replace scatter plot with hexbin (no individual points)
     hb = plt.hexbin(df[x], df[y], gridsize=30, cmap='viridis')
-    plt.colorbar(hb, label='Densité')
+    plt.colorbar(hb, label='Density')
     
-    # Ligne de tendance
+    # Trend line
     if len(df) > 1:
         z = np.polyfit(df[x].astype(float), df[y].astype(float), 1)
         p = np.poly1d(z)
@@ -158,87 +158,87 @@ def make_correlation_plot(x, y, title, xlabel, ylabel, filename):
     plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, filename))
     plt.close()
 
-# Graphes individuels existants
-make_plot('code', 'Lignes de code', 'Lignes de code', 'lines_of_code.png')
-make_plot('complexity', 'Complexité', 'Complexité', 'complexity.png', 'red')
-make_plot('files', 'Nombre de fichiers Dart', 'Nombre de fichiers', 'files_count.png', 'purple')
-make_plot('cost', 'Coût estimé ($)', 'Coût ($)', 'cost.png', 'green')
-make_plot('effort', 'Effort estimé (mois)', 'Effort (mois)', 'effort.png', 'orange')
-make_plot('people', 'Personnes estimées', 'Personnes', 'people.png', 'grey')
-make_plot('bytes', 'Octets traités', 'Octets', 'bytes.png', 'brown')
+# Individual existing graphs
+make_plot('code', 'Lines of Code', 'Lines of Code', 'lines_of_code.png')
+make_plot('complexity', 'Complexity', 'Complexity', 'complexity.png', 'red')
+make_plot('files', 'Number of Dart Files', 'Number of Files', 'files_count.png', 'purple')
+make_plot('cost', 'Estimated Cost ($)', 'Cost ($)', 'cost.png', 'green')
+make_plot('effort', 'Estimated Effort (months)', 'Effort (months)', 'effort.png', 'orange')
+make_plot('people', 'Estimated People', 'People', 'people.png', 'grey')
+make_plot('bytes', 'Bytes Processed', 'Bytes', 'bytes.png', 'brown')
 
-# NOUVEAUX GRAPHIQUES DE COMPARAISON
+# NEW COMPARISON GRAPHS
 
-# 1. Changements par commit (lignes ajoutées/supprimées)
-make_bar_plot('code_change', 'Changement de lignes de code par commit', 'Lignes ajoutées/supprimées', 'code_changes.png')
-make_bar_plot('files_change', 'Changement de fichiers par commit', 'Fichiers ajoutés/supprimés', 'files_changes.png')
-make_bar_plot('complexity_change', 'Changement de complexité par commit', 'Complexité ajoutée/supprimée', 'complexity_changes.png')
-make_bar_plot('bytes_change', 'Changement d\'octets par commit', 'Octets ajoutés/supprimés', 'bytes_changes.png')
+# 1. Changes per commit (lines added/removed)
+make_bar_plot('code_change', 'Code Line Changes per Commit', 'Lines Added/Removed', 'code_changes.png')
+make_bar_plot('files_change', 'File Changes per Commit', 'Files Added/Removed', 'files_changes.png')
+make_bar_plot('complexity_change', 'Complexity Changes per Commit', 'Complexity Added/Removed', 'complexity_changes.png')
+make_bar_plot('bytes_change', 'Byte Changes per Commit', 'Bytes Added/Removed', 'bytes_changes.png')
 
-# 2. Métriques de qualité et ratios
-make_plot('complexity_per_line', 'Complexité par ligne de code', 'Complexité/Ligne', 'complexity_ratio.png', 'darkred')
-make_plot('bytes_per_file', 'Taille moyenne des fichiers', 'Octets/Fichier', 'file_size_avg.png', 'darkorange')
-make_plot('lines_per_file', 'Lignes moyennes par fichier', 'Lignes/Fichier', 'lines_per_file.png', 'darkblue')
+# 2. Quality metrics and ratios
+make_plot('complexity_per_line', 'Complexity per Line of Code', 'Complexity/Line', 'complexity_ratio.png', 'darkred')
+make_plot('bytes_per_file', 'Average File Size', 'Bytes/File', 'file_size_avg.png', 'darkorange')
+make_plot('lines_per_file', 'Average Lines per File', 'Lines/File', 'lines_per_file.png', 'darkblue')
 
-# 3. Vélocité et tendances temporelles
-make_plot('velocity', 'Vélocité de développement', 'Lignes/Jour', 'velocity.png', 'darkgreen')
+# 3. Velocity and temporal trends
+make_plot('velocity', 'Development Velocity', 'Lines/Day', 'velocity.png', 'darkgreen')
 
-# 4. Graphiques de corrélation
-make_correlation_plot('code', 'complexity', 'Corrélation Code vs Complexité', 'Lignes de code', 'Complexité', 'correlation_code_complexity.png')
-make_correlation_plot('files', 'complexity', 'Corrélation Fichiers vs Complexité', 'Nombre de fichiers', 'Complexité', 'correlation_files_complexity.png')
-make_correlation_plot('code', 'cost', 'Corrélation Code vs Coût', 'Lignes de code', 'Coût ($)', 'correlation_code_cost.png')
+# 4. Correlation graphs
+make_correlation_plot('code', 'complexity', 'Code vs Complexity Correlation', 'Lines of Code', 'Complexity', 'correlation_code_complexity.png')
+make_correlation_plot('files', 'complexity', 'Files vs Complexity Correlation', 'Number of Files', 'Complexity', 'correlation_files_complexity.png')
+make_correlation_plot('code', 'cost', 'Code vs Cost Correlation', 'Lines of Code', 'Cost ($)', 'correlation_code_cost.png')
 
-# 5. Graphiques comparatifs avancés
+# 5. Advanced comparative graphs
 
-# Évolution des changements cumulés
+# Evolution of cumulative changes
 plt.figure(figsize=(12,8))
 plt.subplot(2, 2, 1)
 plt.plot(df['date'], df['code_change'].cumsum(), color='blue', label='Code')
-plt.plot(df['date'], df['files_change'].cumsum(), color='purple', label='Fichiers')
+plt.plot(df['date'], df['files_change'].cumsum(), color='purple', label='Files')
 plt.xticks(rotation=45, ha='right')
-plt.title('Changements cumulés')
+plt.title('Cumulative Changes')
 plt.xlabel('Date')
-plt.ylabel('Changements cumulés')
+plt.ylabel('Cumulative Changes')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Distribution des tailles de changements
+# Distribution of change sizes
 plt.subplot(2, 2, 2)
 plt.hist(df['code_change'].dropna(), bins=20, alpha=0.7, color='blue', edgecolor='black')
-plt.title('Distribution des changements de code')
-plt.xlabel('Lignes ajoutées/supprimées')
-plt.ylabel('Fréquence')
+plt.title('Code Change Distribution')
+plt.xlabel('Lines Added/Removed')
+plt.ylabel('Frequency')
 plt.grid(True, alpha=0.3)
 
-# Évolution de l'efficacité (complexité/coût)
+# Evolution of efficiency (complexity/cost)
 plt.subplot(2, 2, 3)
 efficiency = df['complexity'] / df['cost'].replace(0, 1)
 plt.plot(df['date'], efficiency, color='red')
 plt.xticks(rotation=45, ha='right')
-plt.title('Efficacité (Complexité/Coût)')
+plt.title('Efficiency (Complexity/Cost)')
 plt.xlabel('Date')
-plt.ylabel('Efficacité')
+plt.ylabel('Efficiency')
 plt.grid(True, alpha=0.3)
 
-# Tendance de croissance
+# Growth trend
 plt.subplot(2, 2, 4)
 growth_rate = df['code'].pct_change() * 100
 plt.plot(df['date'], growth_rate, color='green')
 plt.axhline(y=0, color='black', linestyle='--', alpha=0.5)
 plt.xticks(rotation=45, ha='right')
-plt.title('Taux de croissance du code (%)')
+plt.title('Code Growth Rate (%)')
 plt.xlabel('Date')
-plt.ylabel('Croissance (%)')
+plt.ylabel('Growth (%)')
 plt.grid(True, alpha=0.3)
 
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'advanced_comparisons.png'), dpi=300)
 plt.close()
 
-# 6. Analyse temporelle détaillée
+# 6. Detailed temporal analysis
 plt.figure(figsize=(14,6))
 
-# Activité par jour de la semaine
+# Activity by day of week
 df['day_of_week'] = df['date'].dt.day_name()
 day_activity = df.groupby('day_of_week')['code_change'].sum().abs()
 day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -247,49 +247,49 @@ day_activity = day_activity.reindex([day for day in day_order if day in day_acti
 plt.subplot(1, 2, 1)
 plt.bar(range(len(day_activity)), day_activity.values, color='skyblue')
 plt.xticks(range(len(day_activity)), [day[:3] for day in day_activity.index], rotation=45)
-plt.title('Activité par jour de la semaine')
-plt.xlabel('Jour')
-plt.ylabel('Changements absolus')
+plt.title('Activity by Day of Week')
+plt.xlabel('Day')
+plt.ylabel('Absolute Changes')
 plt.grid(True, alpha=0.3)
 
-# Tendance sur les 30 derniers jours
+# Last 30 days trend
 plt.subplot(1, 2, 2)
 if len(df) >= 30:
     recent_df = df.tail(30)
     plt.plot(recent_df['date'], recent_df['code'], color='blue', label='Code')
-    plt.plot(recent_df['date'], recent_df['complexity'], color='red', label='Complexité')
+    plt.plot(recent_df['date'], recent_df['complexity'], color='red', label='Complexity')
     plt.xticks(rotation=45, ha='right')
-    plt.title('Tendance des 30 derniers commits')
+    plt.title('Last 30 Commits Trend')
     plt.xlabel('Date')
-    plt.ylabel('Valeur')
+    plt.ylabel('Value')
     plt.legend()
     plt.grid(True, alpha=0.3)
 else:
-    plt.text(0.5, 0.5, 'Pas assez de données\n(< 30 commits)', 
+    plt.text(0.5, 0.5, 'Not enough data\n(< 30 commits)', 
              ha='center', va='center', transform=plt.gca().transAxes, fontsize=12)
-    plt.title('Tendance des 30 derniers commits')
+    plt.title('Last 30 Commits Trend')
 
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'temporal_analysis.png'), dpi=300)
 plt.close()
 
-# 7. Résumé statistique des changements
-print("\n📊 STATISTIQUES DE CHANGEMENTS:")
-print(f"├─ Plus gros ajout de code: {df['code_change'].max():.0f} lignes")
-print(f"├─ Plus grosse suppression: {df['code_change'].min():.0f} lignes")
-print(f"├─ Changement moyen par commit: {df['code_change'].mean():.1f} lignes")
-print(f"├─ Médiane des changements: {df['code_change'].median():.1f} lignes")
-print(f"├─ Écart-type: {df['code_change'].std():.1f} lignes")
-print(f"└─ Commits avec ajouts: {(df['code_change'] > 0).sum()}/{len(df)} ({(df['code_change'] > 0).mean()*100:.1f}%)")
+# 7. Statistical summary of changes
+print("\n📊 CHANGE STATISTICS:")
+print(f"├─ Largest code addition: {df['code_change'].max():.0f} lines")
+print(f"├─ Largest code deletion: {df['code_change'].min():.0f} lines")
+print(f"├─ Average change per commit: {df['code_change'].mean():.1f} lines")
+print(f"├─ Median of changes: {df['code_change'].median():.1f} lines")
+print(f"├─ Standard deviation: {df['code_change'].std():.1f} lines")
+print(f"└─ Commits with additions: {(df['code_change'] > 0).sum()}/{len(df)} ({(df['code_change'] > 0).mean()*100:.1f}%)")
 
-# 8. Heatmap des corrélations
+# 8. Correlation heatmap
 correlation_data = df[['code', 'complexity', 'files', 'cost', 'effort', 'people', 'bytes']].corr()
 
 plt.figure(figsize=(10,8))
 im = plt.imshow(correlation_data, cmap='RdBu_r', aspect='auto', vmin=-1, vmax=1)
-plt.colorbar(im, label='Corrélation')
+plt.colorbar(im, label='Correlation')
 
-# Ajouter les valeurs dans les cellules
+# Add values in cells
 for i in range(len(correlation_data.columns)):
     for j in range(len(correlation_data.columns)):
         plt.text(j, i, f'{correlation_data.iloc[i, j]:.2f}', 
@@ -297,12 +297,12 @@ for i in range(len(correlation_data.columns)):
 
 plt.xticks(range(len(correlation_data.columns)), correlation_data.columns, rotation=45, ha='right')
 plt.yticks(range(len(correlation_data.columns)), correlation_data.columns)
-plt.title('Matrice de corrélation des métriques')
+plt.title('Metrics Correlation Matrix')
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'correlation_matrix.png'), dpi=300)
 plt.close()
 
-# Graphe combiné normalisé
+# Combined normalized graph
 plt.figure(figsize=(12,6))
 for col, color in [
     ('code', 'blue'),
@@ -315,28 +315,27 @@ for col, color in [
 ]:
     if df[col].max() > df[col].min():
         norm = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
-        # Tracer uniquement la courbe normalisée (sans points)
+        # Plot normalized curve only (no points)
         plt.plot(df['date'], norm, label=col.capitalize(), color=color)
 
 plt.xticks(rotation=45, ha='right')
-plt.title('Évolution normalisée des indicateurs')
+plt.title('Normalized Evolution of Indicators')
 plt.xlabel('Date')
-plt.ylabel('Valeur normalisée (0-1)')
+plt.ylabel('Normalized Value (0-1)')
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'combined_normalized.png'))
 plt.close()
 
-# 9. Courbes de ratios normalisées (min-max par série)
-# Ces courbes comparent des rapports utiles tout en replaçant
-# chaque série à l'échelle 0-1 pour éviter qu'une série domine l'axe.
+# 9. Normalized ratio curves (min-max per series)
+# These curves compare useful ratios while rescaling
+# each series to 0-1 scale to avoid one series dominating the axis.
 ratios = {
-    'Lignes / Fichier': df['code'] / df['files'].replace(0, pd.NA),
-    # inverser Lignes/Complexité → Complexité/Lignes selon demande
-    'Complexité / Lignes': df['complexity'] / df['code'].replace(0, pd.NA),
-    'Complexité / Fichier': df['complexity'] / df['files'].replace(0, pd.NA),
-    'Octets / Fichier': df['bytes'] / df['files'].replace(0, pd.NA)
+    'Lines / File': df['code'] / df['files'].replace(0, pd.NA),
+    'Complexity / Lines': df['complexity'] / df['code'].replace(0, pd.NA),
+    'Complexity / File': df['complexity'] / df['files'].replace(0, pd.NA),
+    'Bytes / File': df['bytes'] / df['files'].replace(0, pd.NA)
 }
 
 ratio_df = pd.DataFrame({k: v.replace([np.inf, -np.inf], pd.NA).fillna(0) for k, v in ratios.items()})
@@ -348,25 +347,25 @@ ratio_norm = (ratio_df - ratio_df.min()) / norm_den
 plt.figure(figsize=(12, 6))
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
 for i, col in enumerate(ratio_norm.columns):
-    # Tracer uniquement des courbes (sans points) pour une lecture plus propre
+    # Plot curves only (no points) for cleaner reading
     plt.plot(df['date'], ratio_norm[col], label=col, color=colors[i % len(colors)])
 
 plt.xticks(rotation=45, ha='right')
-plt.title('Courbes comparatives des ratios (normalisées par série 0-1)')
+plt.title('Comparative Ratio Curves (normalized per series 0-1)')
 plt.xlabel('Date')
-plt.ylabel('Valeur normalisée (0-1)')
+plt.ylabel('Normalized Value (0-1)')
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig(os.path.join(OUTPUT_GRAPH_DIR, 'ratio_curves.png'), dpi=300)
 plt.close()
 
-print(f"\n✅ Graphiques générés dans {OUTPUT_GRAPH_DIR}")
-print(f"📈 Nouveaux graphiques ajoutés:")
-print("   ├─ Changements par commit (code_changes.png, files_changes.png, etc.)")
-print("   ├─ Métriques de qualité (complexity_ratio.png, file_size_avg.png, etc.)")
-print("   ├─ Vélocité de développement (velocity.png)")
-print("   ├─ Corrélations (correlation_*.png)")
-print("   ├─ Comparaisons avancées (advanced_comparisons.png)")
-print("   ├─ Analyse temporelle (temporal_analysis.png)")
-print("   └─ Matrice de corrélation (correlation_matrix.png)")
+print(f"\n✅ Graphs generated in {OUTPUT_GRAPH_DIR}")
+print(f"📈 New graphs added:")
+print("   ├─ Changes per commit (code_changes.png, files_changes.png, etc.)")
+print("   ├─ Quality metrics (complexity_ratio.png, file_size_avg.png, etc.)")
+print("   ├─ Development velocity (velocity.png)")
+print("   ├─ Correlations (correlation_*.png)")
+print("   ├─ Advanced comparisons (advanced_comparisons.png)")
+print("   ├─ Temporal analysis (temporal_analysis.png)")
+print("   └─ Correlation matrix (correlation_matrix.png)")
